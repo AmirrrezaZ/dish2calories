@@ -132,7 +132,7 @@ class NutritionLoss(nn.Module):
 
         # ----- accuracy metric (multi-label, micro by default)
         if self._acc_metric is None:
-            self._acc_metric = MultilabelAccuracy(num_labels=C, average="micro", threshold=self.threshold)
+            self._acc_metric = MultilabelAccuracy(num_labels=C, average="micro", threshold=self.threshold).to(device)
 
         probs = logits.sigmoid()
         acc = self._acc_metric(probs, target_class.int())  # returns a scalar tensor

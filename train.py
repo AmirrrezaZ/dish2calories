@@ -93,7 +93,7 @@ def train_model(data_loader, model, criterion, config):
             for batch in pbar:
                 images = batch['image'].to(device=device, dtype=torch.float32)
                 target = {
-                    "cls_one_hot": batch["cls_one_hot"].to(device=device, dtype=torch.float32),
+                    "cls_multi_hot": batch["cls_multi_hot"].to(device=device, dtype=torch.float32),
                     "mass": batch["mass"].to(device=device, dtype=torch.float32),
                 }
 
@@ -130,7 +130,7 @@ def train_model(data_loader, model, criterion, config):
                 for batch in val_loader:
                     images = batch['image'].to(device=device, dtype=torch.float32)
                     target = {
-                        "cls_one_hot": batch["cls_one_hot"].to(device=device, dtype=torch.float32, non_blocking=True),
+                        "cls_multi_hot": batch["cls_multi_hot"].to(device=device, dtype=torch.float32, non_blocking=True),
                         "mass": batch["mass"].to(device=device, dtype=torch.float32),
                     }
                     
