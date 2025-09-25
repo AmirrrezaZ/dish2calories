@@ -5,6 +5,7 @@ from tqdm import tqdm
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import OneCycleLR
+from torchmetrics.classification import MultilabelF1Score
 
 
 def train_model(data_loader, model, criterion, config):
@@ -43,9 +44,11 @@ def train_model(data_loader, model, criterion, config):
     device = torch.device(config['device'])
     model.to(device)
     
+    
     # Move criterion to device if it has parameters
-    if hasattr(criterion, 'to'):
-        criterion = criterion.to(device)
+    # if hasattr(criterion, 'to'):
+    #     criterion = criterion.to(device)
+    criterion.multitaskloss_instance.to(device)
 
     # ---- Optimizer & Scheduler ----
     optimizer = Adam(
@@ -77,6 +80,12 @@ def train_model(data_loader, model, criterion, config):
     best_ckpt_path = weights_dir / f"{config['model_type']}.pth"
 
     grad_clip = float(config.get('grad_clip', 1.0))
+    
+
+    train_f1_micro = MultilabelF1Score(num_labels=model.num_classes).to(device)
+    val_f1_micro   = MultilabelF1Score(num_labels=model.num_classes).to(device)
+
+    
 
     # Validation check
     if len(train_loader) == 0 or len(val_loader) == 0:
@@ -90,6 +99,7 @@ def train_model(data_loader, model, criterion, config):
             train_loss_dict = {}
 
             pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{epochs}", unit="batch")
+            train_f1_micro.reset()
             for batch in pbar:
                 images = batch['image'].to(device=device, dtype=torch.float32)
                 target = {
@@ -100,12 +110,23 @@ def train_model(data_loader, model, criterion, config):
                 optimizer.zero_grad()
                 outputs = model(images)
                 loss, loss_dict = criterion(target, outputs)
+                
+                probs = outputs["classification"].sigmoid()
+                train_f1_micro.update(probs, target["cls_multi_hot"].int())
+                
+                
 
                 # Backward pass
                 loss.backward()
                 
                 if grad_clip > 0:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                    # torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                    torch.nn.utils.clip_grad_norm_(
+                            list(model.parameters()) + list(criterion.multitaskloss_instance.parameters()),
+                            grad_clip
+                        )
+
+                    
             
                 # Step optimizer & scheduler
                 optimizer.step()
@@ -120,12 +141,13 @@ def train_model(data_loader, model, criterion, config):
 
             avg_train_loss = running_train_loss / max(1, len(train_loader))
             avg_train_loss_dict = {k: v / len(train_loader) for k, v in train_loss_dict.items()}
+            avg_train_loss_dict['acc']=train_f1_micro.compute().item()
 
             # ---- Validate ----
             model.eval()
             val_loss = 0.0
             val_loss_dict = {}
-            
+            val_f1_micro.reset()
             with torch.no_grad():
                 for batch in val_loader:
                     images = batch['image'].to(device=device, dtype=torch.float32)
@@ -136,6 +158,11 @@ def train_model(data_loader, model, criterion, config):
                     
                     outputs = model(images)
                     loss, loss_dict = criterion(target, outputs)
+                    
+                    probs = outputs["classification"].sigmoid()
+                    val_f1_micro.update(probs, target["cls_multi_hot"].int())
+                    
+              
 
                     val_loss += loss.item()
                     for k, v in loss_dict.items():
@@ -144,6 +171,7 @@ def train_model(data_loader, model, criterion, config):
 
             avg_val_loss = val_loss / max(1, len(val_loader))
             avg_val_loss_dict = {k: v / len(val_loader) for k, v in val_loss_dict.items()}
+            avg_val_loss_dict['acc'] = val_f1_micro.compute().item()
 
             logger.info(
                 f"Epoch {epoch} | "
@@ -270,6 +298,7 @@ if __name__ == "__main__":
     criterion = NutritionMultiTaskLoss(
         regression_type="mae",
         pos_class_weights=pos_class_weights,
+        scale_factor=100,
     )
 
     # ----------------------------

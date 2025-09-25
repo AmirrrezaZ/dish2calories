@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 from typing import Dict, Tuple, Optional
-from torchmetrics.classification import MultilabelAccuracy
-
 
 class NutritionLoss(nn.Module):
     """
@@ -23,8 +21,7 @@ class NutritionLoss(nn.Module):
     pos_class_weights: Optional[torch.Tensor] = None
         Per-class positive weights for BCE (shape [C]), passed as `pos_weight`.
         Use this for class imbalance (higher value => penalize FN more).
-    threshold: float = 0.5
-        Threshold for metrics.
+
     """
 
     def __init__(
@@ -33,7 +30,6 @@ class NutritionLoss(nn.Module):
         lambda_mass: float = 1.0,
         regression_type: str = "mae",
         pos_class_weights: Optional[torch.Tensor] = None,
-        threshold: float = 0.5,
     ):
         super().__init__()
 
@@ -52,9 +48,7 @@ class NutritionLoss(nn.Module):
 
         self.lambda_cls = float(lambda_cls)
         self.lambda_mass = float(lambda_mass)
-        self.threshold = float(threshold)
 
-        self._acc_metric: Optional[MultilabelAccuracy] = None  # lazily init once we know C
 
     @staticmethod
     def _to_multi_hot(
@@ -130,18 +124,11 @@ class NutritionLoss(nn.Module):
         # ----- weighted sum
         total = self.lambda_cls * loss_cls + self.lambda_mass * loss_mass
 
-        # ----- accuracy metric (multi-label, micro by default)
-        if self._acc_metric is None:
-            self._acc_metric = MultilabelAccuracy(num_labels=C, average="micro", threshold=self.threshold).to(device)
-
-        probs = logits.sigmoid()
-        acc = self._acc_metric(probs, target_class.int())  # returns a scalar tensor
 
         loss_dict = {
             "total": total,
-            "cls": loss_cls,
-            "mass": loss_mass,
-            "acc": acc,
+            "cls": self.lambda_cls,
+            "mass": self.lambda_mass,
         }
 
         return total, loss_dict
@@ -196,6 +183,7 @@ class NutritionMultiTaskLoss:
         self,
         regression_type: str = "mae",
         pos_class_weights: Optional[torch.Tensor] = None,
+        scale_factor: int = 100,
     ):
         self.criterion = NutritionLoss(
             regression_type=regression_type,
@@ -204,8 +192,9 @@ class NutritionMultiTaskLoss:
         
         self.multitaskloss_instance = MultiTaskLoss(
             is_regression=torch.Tensor([False, True]),
-            reduction='mean'
+            reduction='sum'
         )
+        self.scale_factor = scale_factor
 
     def __call__(
         self, 
@@ -214,7 +203,10 @@ class NutritionMultiTaskLoss:
     ):
         _, loss_dict = self.criterion(target, output)
         
-        losses = torch.stack([loss_dict['cls'], loss_dict['mass']])
+        L_cls = loss_dict["cls"] * self.scale_factor
+        L_mass = loss_dict["mass"] * self.scale_factor
+   
+        losses = torch.stack([L_cls, L_mass])
         mt_loss = self.multitaskloss_instance(losses)
         
         loss_dict['total'] = mt_loss

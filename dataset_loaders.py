@@ -48,13 +48,13 @@ class Nutrition5kDataset(Dataset):
         # -------- build df & splits --------
         base_dir = Path(base_dir)
         df = build_metadata(base_dir=str(base_dir), id_col="id", n=n, seed=seed)
-        
+ 
         df = stratified_split(df, label_col="label", test_frac=test_frac, val_frac=val_frac, seed=seed)
         
-    
+        df_unscaled = df.copy()
         # --------StandardScaler --------
         df, scalers = scale_nutrition_features(df, scalers=None, cols = cols_to_scale)
-        
+    
 
         classes, cls2idx, idx2cls = build_classes(df, "label")
         weights = compute_class_weights(df, cls2idx, label_col="label", method="balanced")
@@ -66,6 +66,7 @@ class Nutrition5kDataset(Dataset):
             raise ValueError(f"Invalid split name: {split!r}. Expected one of ['train','val','test'].")
 
         df_split = df[df["tag"] == split].reset_index(drop=True)
+        df_unscaled = df_unscaled[df_unscaled["tag"] == split].reset_index(drop=True)
         
         
 
@@ -86,7 +87,8 @@ class Nutrition5kDataset(Dataset):
         class_to_idx_norm = {str(k).strip().lower(): v for k, v in cls2idx.items()}
 
         norm_ingr = build_norm_ingr_table(class_to_idx_norm, norm_ingr_dict)
-
+        
+  
         # -------- store state --------
         self.df = df_split
         self.split = split
@@ -104,6 +106,11 @@ class Nutrition5kDataset(Dataset):
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
+        
+        df_unscaled["cls_multi_hot"] = df_unscaled["label"].apply(self._encode_multi_hot)
+        self.df_unscaled = df_unscaled
+        self.df['cls_multi_hot'] = df_unscaled["cls_multi_hot"]
+
 
     def __len__(self) -> int:
         return len(self.df)
@@ -123,7 +130,8 @@ class Nutrition5kDataset(Dataset):
         image = self.transform(image) if self.transform else image
 
         # --- Multi-hot labels ---
-        multi_hot = self._encode_multi_hot(row["label"])
+        # multi_hot = self._encode_multi_hot(row["label"])
+        multi_hot = row['cls_multi_hot']
 
         # --- Nutrition features as tensors ---
 

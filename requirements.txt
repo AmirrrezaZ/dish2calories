@@ -1,0 +1,13 @@
+fastapi==0.117.1
+matplotlib==3.8.3
+numpy==2.3.3
+pandas==2.3.2
+Pillow==11.3.0
+pydantic==2.11.9
+requests==2.32.5
+scikit_learn==1.7.2
+streamlit==1.49.1
+torchmetrics>=1.4.0
+tqdm==4.66.2
+uvicorn==0.37.0
+
