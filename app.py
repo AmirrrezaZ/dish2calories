@@ -168,7 +168,7 @@ def main():
     if not check_api_health():
         st.error("🚨 **CalorieNet API is not running!**")
         st.info("Please start the API server first:")
-        st.code("python calorienet_api.py", language="bash")
+        st.code("python infrence.py", language="bash")
         st.stop()
     
     # File uploader
