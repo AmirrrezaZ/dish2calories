@@ -16,3 +16,9 @@ RUN apt-get update && \
     && pip install --no-cache-dir -r requirements.txt \
     && rm -rf /var/lib/apt/lists/*
 
+# (Optional) show these ports in docker ps; compose still maps them
+EXPOSE 8000
+EXPOSE 8501
+
+# (Optional) avoid Streamlit asking for a browser
+ENV STREAMLIT_SERVER_HEADLESS=true

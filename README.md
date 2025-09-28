@@ -128,40 +128,30 @@ For a single image, this is returned via the FastAPI endpoint or displayed in th
 
 ---
 
+
 ## ⚙️ Installation & Usage
 
-### 🔹 Clone Repository
+1. **Clone Repository**
+
 ```bash
 git clone <repository-url>
 cd dish2calories
-````
-
-### 🔹 Docker Setup
-
-1. **Build**
-
-```bash
-docker build -t dish2calories .
 ```
 
-2. **Run (with GPU support)**
+2. **Run (Docker Compose)**
 
 ```bash
-docker run -it --gpus all -p 8000:8000 -p 8501:8501 dish2calories bash
-```
-
-3. **Inside container**
-
-```bash
-# Start FastAPI
-python inference.py  
-
-# Start Streamlit UI
-streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+docker compose up --build
 ```
 
 * FastAPI: [http://localhost:8000](http://localhost:8000)
 * Streamlit: [http://localhost:8501](http://localhost:8501)
+
+**Tips**
+
+* Run in background: `docker compose up --build -d`
+* Stop & clean up: `docker compose down`
+* Using GPU? Make sure the NVIDIA Container Toolkit is installed on the host.
 
 ### 🔹 Running Locally (Without Docker)
 
