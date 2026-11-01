@@ -1,10 +1,9 @@
-# CPU by default:      docker compose up --build
-# With an NVIDIA GPU:  docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+# docker compose up --build
 services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.cpu
+      dockerfile: Dockerfile
     container_name: dish2calories-api
     command: python inference.py
     environment:
@@ -17,7 +16,7 @@ services:
   ui:
     build:
       context: .
-      dockerfile: Dockerfile.cpu
+      dockerfile: Dockerfile
     container_name: dish2calories-ui
     command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
     environment:

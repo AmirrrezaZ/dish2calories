@@ -4,45 +4,28 @@ Shared model-loading and result-formatting helpers.
 Kept free of FastAPI/Streamlit imports so both the API (inference.py) and the
 Streamlit app (app.py, in-process mode) can use it with a light dependency set.
 """
-import os
 from pathlib import Path
 from typing import Dict
 
-import torch
-
-from dataset_loaders import DatasetInfo
-from models import CalorieNet
-from predict import CalorieNetPredictor
+from onnx_predictor import OnnxCalorieNetPredictor
 
 MODEL_TYPE = "efficientnet_b0"
 DATASET_CONFIG = "configs/dataset_info.json"
 WEIGHTS_DIR = "weights"
 CLS_THRESHOLD = 0.5
 TEMPERATURE = 0.5
-DEVICE = os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 
 
-def load_predictor() -> CalorieNetPredictor:
-    """Load weights + class info and build the predictor."""
+def load_predictor() -> OnnxCalorieNetPredictor:
+    """Load the ONNX model (CPU, no PyTorch needed). Create it with `python export_onnx.py`."""
     config_path = Path(DATASET_CONFIG)
-    weights_path = Path(WEIGHTS_DIR) / f"{MODEL_TYPE}.pth"
+    onnx_path = Path(WEIGHTS_DIR) / f"{MODEL_TYPE}.onnx"
     if not config_path.exists():
         raise FileNotFoundError(f"Config not found: {config_path}")
-    if not weights_path.exists():
-        raise FileNotFoundError(f"Weights not found: {weights_path}")
-
-    info = DatasetInfo.from_json(str(config_path))
-    model, _ = CalorieNet.from_checkpoint(str(weights_path), device=DEVICE)
-    return CalorieNetPredictor(
-        model=model,
-        norm_ingr=info.norm_ingr,
-        scaler=info.scalers["total_mass"],
-        idx2cls=info.idx2cls,
-        img_size=info.img_size,
-        cls_threshold=CLS_THRESHOLD,
-        temperature=TEMPERATURE,
-        mode="probs",
-        device=DEVICE,
+    if not onnx_path.exists():
+        raise FileNotFoundError(f"ONNX model not found: {onnx_path} (run `python export_onnx.py`)")
+    return OnnxCalorieNetPredictor(
+        onnx_path, config_path, cls_threshold=CLS_THRESHOLD, temperature=TEMPERATURE, mode="probs"
     )
 
 

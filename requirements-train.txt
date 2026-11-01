@@ -1,3 +1,11 @@
-# Extra dependencies for training / evaluation. Install after requirements.txt.
+# Extra dependencies for training / evaluation / ONNX export. Install after requirements.txt.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.3
+torchvision>=0.18
 torchmetrics>=1.4.0
-matplotlib==3.8.3
+pandas
+scikit-learn
+tqdm
+matplotlib
+onnx
+onnxscript

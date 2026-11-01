@@ -1,13 +1,8 @@
-# Runtime dependencies for the Streamlit app (runs the model in-process).
-# CPU-only PyTorch: ~200 MB instead of the ~2.5 GB CUDA wheels pulled from PyPI,
-# which is what made Streamlit Cloud deploys slow. On Linux pip picks the +cpu build.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.3
-torchvision>=0.18
-streamlit==1.49.1
-requests==2.32.5
-numpy==2.3.3
-pandas==2.3.2
-Pillow==11.3.0
-scikit_learn==1.7.2
-tqdm==4.66.2
+# Runtime dependencies (Streamlit app + API). Inference uses ONNX Runtime, so no PyTorch is needed.
+# Deliberately unpinned: exact pins (e.g. pandas==2.3.2) have no wheels for newer Python versions
+# (Streamlit Cloud uses Python 3.14) and force slow source builds.
+streamlit>=1.49
+requests
+numpy
+Pillow
+onnxruntime
