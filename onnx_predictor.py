@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Union
 
 import numpy as np
 import onnxruntime as ort
-from PIL import Image
+from PIL import Image, ImageOps
 
 _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(1, 1, 3)
 _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(1, 1, 3)
@@ -54,8 +54,18 @@ class OnnxCalorieNetPredictor:
         )
 
     # ---------------- preprocessing ----------------
+    @staticmethod
+    def _to_rgb(pil: Image.Image) -> Image.Image:
+        """Apply EXIF rotation (phone photos) and flatten transparency onto white."""
+        pil = ImageOps.exif_transpose(pil)
+        if pil.mode in ("RGBA", "LA") or (pil.mode == "P" and "transparency" in pil.info):
+            rgba = pil.convert("RGBA")
+            bg = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+            return Image.alpha_composite(bg, rgba).convert("RGB")
+        return pil.convert("RGB")
+
     def _preprocess(self, pil: Image.Image) -> np.ndarray:
-        pil = pil.convert("RGB").resize((self.img_size, self.img_size), Image.BILINEAR)
+        pil = self._to_rgb(pil).resize((self.img_size, self.img_size), Image.BILINEAR)
         x = np.asarray(pil, dtype=np.float32) / 255.0
         x = (x - _MEAN) / _STD
         return x.transpose(2, 0, 1)[None].astype(np.float32)  # [1,3,H,W]
@@ -98,7 +108,9 @@ class OnnxCalorieNetPredictor:
         mass_g = np.clip(mass.reshape(-1).astype(np.float32) * self.mass_scale + self.mass_mean, 0.0, None)
 
         prot, fat, carb = per_gram[:, 0] * mass_g, per_gram[:, 1] * mass_g, per_gram[:, 2] * mass_g
+        top = np.argsort(-probs[0])[:5]
         return {
+            "top_candidates": [(self.idx2cls[int(i)], float(probs[0, i])) for i in top],
             "total_protein": prot,
             "total_fat": fat,
             "total_carbs": carb,

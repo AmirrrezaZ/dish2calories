@@ -1,50 +1,105 @@
+<div align="center">
 
-# dish2calories
+# 🍽️ dish2calories
 
-![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![PyTorch](https://img.shields.io/badge/PyTorch-EfficientNet--B0-red)
+**Snap a plate. Get calories, macros and ingredients in seconds.**
 
-**dish2calories** is a reimplementation of the **Nutrition5k** dataset and model, designed to estimate the nutritional content of a dish (calories, protein, fat, carbohydrates, and mass) from a single image.  
-It combines **multi-label ingredient classification** with **mass regression**, leveraging a deep learning model built on an **EfficientNet-B0 backbone**.
+A reimplementation of **Nutrition5k**: multi-label ingredient classification + mass regression on an EfficientNet-B0 backbone.
 
+[![Live demo](https://img.shields.io/badge/🚀_live_demo-streamlit.app-FF4B4B?style=for-the-badge)](https://dish2calories.streamlit.app/)
+
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)
+![PyTorch](https://img.shields.io/badge/trained_with-PyTorch-EE4C2C?style=flat-square)
+![ONNX](https://img.shields.io/badge/served_with-ONNX_Runtime-005CED?style=flat-square)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?style=flat-square)
+
+<img src="pics/ui.png" alt="dish2calories UI" width="420"/>
+
+[Quick Start](#-quick-start) · [How it works](#-how-it-works) · [Results](#-results) · [Limitations](#️-limitations-why-random-web-photos-can-look-wrong) · [Training](#-training--evaluation)
+
+</div>
 
 ---
 
-<p align="center">
-  <img src="pics/ui.jpg" alt="dish2calories ui" width="300"/>
-</p>
+## ✨ Features
+
+| | |
+|---|---|
+| 🥗 **Ingredient detection** | Multi-label classification over 75 Nutrition5k ingredients with per-ingredient confidence |
+| ⚖️ **Mass estimation** | Predicts total dish mass in grams |
+| 🔥 **Full nutrition** | Calories, protein, fat and carbs from detected ingredients × mass |
+| 🪶 **Lightweight** | Serves on CPU with ONNX Runtime: no PyTorch or GPU needed |
+| 🔌 **API + UI** | FastAPI endpoint and a Streamlit app, or one Docker container |
+
+## 🧭 Pipeline
+
+```mermaid
+flowchart LR
+    A[📷 Dish photo] --> B[Resize 256×256<br/>+ normalize]
+    B --> C[EfficientNet-B0<br/>backbone]
+    C --> D[Classification head<br/>75 ingredients]
+    C --> E[Regression head<br/>mass in g]
+    D --> F[Per-gram nutrition<br/>norm_ingr table]
+    F --> G[× mass]
+    E --> G
+    G --> H[🔥 kcal · protein · fat · carbs]
+```
 
 ---
 
+## 🚀 Quick Start
 
+```bash
+git clone https://github.com/AmirrrezaZ/dish2calories.git
+cd dish2calories
+docker compose up --build        # API on :8000, UI on :8501
+```
 
-## 📌 Overview
-The project uses a **multi-task learning** approach to:
+Or without Docker:
 
-- **Classify Ingredients**: Identify which ingredients are present in a dish image.
-- **Predict Mass**: Estimate the total dish mass (in grams).
-- **Calculate Nutrition**: Combine predictions with per-gram nutritional data to compute:
-  - Total Calories  
-  - Protein  
-  - Fat  
-  - Carbohydrates  
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-The model is served via:
-- **FastAPI** (`inference.py`) → for programmatic inference.
-- **Streamlit** (`app.py`) → for interactive user-friendly UI.  
-- **Docker** → for portable and easy deployment.
+Call the API directly:
+
+```bash
+curl -F "file=@dataset/test.jpg" http://localhost:8000/predict
+```
+
+<details>
+<summary>Example response</summary>
+
+```json
+{
+  "total_protein": 43.4,
+  "total_fat": 21.1,
+  "total_carbs": 44.7,
+  "total_calories": 542.2,
+  "total_mass": 482.3,
+  "labels_txt": ["arugula", "brussels sprouts", "fried rice", "pork", "tofu"],
+  "labels_conf": [1.0, 1.0, 1.0, 1.0, 0.76],
+  "mean_conf": 0.95,
+  "top_candidates": [["arugula", 1.0], ["brussels sprouts", 1.0], ["fried rice", 1.0], ["pork", 1.0], ["tofu", 0.76]]
+}
+```
+
+Interactive docs: <http://localhost:8000/docs>
+</details>
 
 ---
 
 ## 📊 Dataset
-The model is trained on the **Nutrition5k dataset**, which includes:
 
-- **5000 unique dishes**, each with ~16 images from alternating angles.
-- **Directory structure**: Images grouped by dish ID.
-- **Metadata**: CSVs with nutritional info (calories, protein, fat, carbs, and mass).
+The model is trained on **Nutrition5k**: ~5000 cafeteria dishes photographed from above and from side angles, with per-dish calories, macros, mass and ingredient lists.
 
-**Sources**:
-- [Kaggle: Nutrition5k Dataset (Side-Angle Images)](https://www.kaggle.com/search?q=nutrition5k)
+- [Kaggle: Nutrition5k (side-angle images)](https://www.kaggle.com/search?q=nutrition5k)
 - [GitHub: google-research-datasets/nutrition5k](https://github.com/google-research-datasets/nutrition5k)
+
+The repo contains only the metadata CSVs in `dataset/`; download the images yourself to retrain.
 
 ---
 
@@ -94,7 +149,7 @@ Ingredient classification (multi-label, micro-averaged):
 
 ---
 
-## 🔍 What Does the Model Do?
+## 🔍 How It Works
 The dish2calories model's methodology enhances interpretability through transparent ingredient classification, mass regression, and nutritional calculations, while being more lightweight than Google's baseline by using EfficientNet-B0 and only two task heads (classification and regression) compared to Google's four.
 The classification head takes the features from EfficientNet-B0 and predicts which ingredients are present.  
 This is a multi-label classification task, meaning the model can predict multiple ingredients at once (e.g., a dish might have chicken and rice).  
@@ -134,39 +189,7 @@ The model returns a dictionary with:
 - Confidence Scores: How sure the model is about each ingredient (e.g., [0.8, 0.6]).  
 - Mean Confidence: Average confidence across detected ingredients.  
 
-For a single image, this is returned via the FastAPI endpoint or displayed in the Streamlit UI.  
-
----
-
-
-## 🚀 Quick Start
-
-```bash
-git clone https://github.com/AmirrrezaZ/dish2calories.git
-cd dish2calories
-docker compose up --build        # CPU, no GPU needed
-```
-
-Open the UI at <http://localhost:8501> and upload a dish photo. Or call the API directly:
-
-```bash
-curl -F "file=@dataset/test.jpg" http://localhost:8000/predict
-```
-
-```json
-{
-  "total_protein": 30.1,
-  "total_fat": 4.2,
-  "total_carbs": 28.0,
-  "total_calories": 268.0,
-  "total_mass": 200.0,
-  "labels_txt": ["chicken", "rice"],
-  "labels_conf": [0.8, 0.6],
-  "mean_conf": 0.7
-}
-```
-
-(Values above are illustrative.) Interactive API docs are at <http://localhost:8000/docs>.
+For a single image, this is returned via the FastAPI endpoint or displayed in the Streamlit UI.
 
 ---
 
@@ -251,12 +274,17 @@ The repo already ships trained weights (`.pth` for training/evaluation and `.onn
 
 ---
 
-## ⚠️ Limitations
+## ⚠️ Limitations: why random web photos can look "wrong"
 
-- Estimates come from a **single image**, so hidden ingredients, sauces and portion depth are hard to see. Mass error is ~29 g on the test set.
-- Trained on Nutrition5k (cafeteria dishes), so accuracy drops on other cuisines, packaged foods and unusual plating.
-- The ingredient vocabulary is fixed to the classes in `configs/dataset_info.json`.
+This is not a pipeline bug: inference preprocessing matches training exactly, and the exported ONNX model matches the PyTorch one to ~1e-4. The errors come from what the model has seen:
+
+- **Closed vocabulary.** Only 75 ingredients exist (see `configs/dataset_info.json`). There is no pasta, bread, noodles, soup, dessert or most non-Western foods, so a pasta-with-meatballs photo gets matched to the nearest known ingredient (e.g. `pork`) and carbs come out as 0.
+- **Domain shift.** Nutrition5k is one cafeteria with a fixed camera, lighting and plate type. Stock photos, angled shots and heavy styling are out-of-distribution.
+- **Mass from one image.** Without a depth sensor or scale reference, mass is a guess (~29 g MAE *on the dataset's own camera setup*).
+- **Nutrition = ingredient average × mass.** Detected ingredients are weighted by confidence, not by how much of each is on the plate.
 - Results are estimates for general interest, **not medical or dietary advice**.
+
+The UI shows per-ingredient confidence and the model's other top candidates, and warns when confidence is low. For better real-world accuracy, retrain on a broader ingredient-labelled dataset and extend `norm_ingr`.
 
 ---
 

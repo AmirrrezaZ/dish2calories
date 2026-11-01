@@ -10,59 +10,67 @@ from PIL import Image
 
 # Page config
 st.set_page_config(
-    page_title="CalorieNet - Food Nutrition Analyzer",
-    page_icon="🍎",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    page_title="dish2calories - Food Nutrition Analyzer",
+    page_icon="🍽️",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-# Custom CSS
+# Custom CSS (colors use transparency so it works in both light and dark themes)
 st.markdown("""
 <style>
-    .main-header {
+    .block-container { max-width: 880px; padding-top: 2rem; }
+    #MainMenu, footer { visibility: hidden; }
+
+    .hero {
         text-align: center;
-        color: #2E86AB;
-        font-size: 3rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    .sub-header {
-        text-align: center;
-        color: #A23B72;
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .metric-value {
-        font-size: 2rem;
-        font-weight: bold;
-    }
-    .metric-label {
-        font-size: 0.9rem;
-        opacity: 0.8;
-    }
-    .food-tag {
-        display: inline-block;
-        background: #f0f2f6;
-        color: #262730;
-        padding: 0.3rem 0.8rem;
+        padding: 2.2rem 1rem 1.6rem;
+        margin-bottom: 1.2rem;
         border-radius: 20px;
-        margin: 0.2rem;
-        font-size: 0.9rem;
-        border: 2px solid #e0e0e0;
+        background: linear-gradient(135deg, rgba(16,185,129,.18), rgba(59,130,246,.16) 55%, rgba(168,85,247,.16));
+        border: 1px solid rgba(128,128,128,.22);
     }
-    .confidence-bar {
-        height: 8px;
-        border-radius: 4px;
-        margin: 0.2rem 0;
+    .hero h1 { font-size: 2.6rem; font-weight: 800; margin: 0; padding: 0;
+               background: linear-gradient(90deg,#10b981,#3b82f6 60%,#a855f7);
+               -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { margin: .5rem 0 0; opacity: .8; font-size: 1.05rem; }
+    .hero .pills { margin-top: 1rem; }
+    .pill { display: inline-block; padding: .2rem .75rem; margin: .15rem; border-radius: 999px;
+            font-size: .78rem; border: 1px solid rgba(128,128,128,.35); background: rgba(128,128,128,.10); }
+
+    .section-title { font-size: 1.15rem; font-weight: 700; margin: 1.6rem 0 .6rem; }
+
+    .kcal-card {
+        text-align: center; padding: 1.4rem 1rem; border-radius: 18px;
+        background: linear-gradient(135deg, #10b981, #3b82f6); color: #fff;
+        box-shadow: 0 8px 24px rgba(59,130,246,.25);
     }
+    .kcal-card .value { font-size: 3.4rem; font-weight: 800; line-height: 1; }
+    .kcal-card .label { opacity: .9; margin-top: .3rem; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; }
+
+    .macro-card { text-align: center; padding: 1rem .5rem; border-radius: 16px;
+                  background: rgba(128,128,128,.08); border: 1px solid rgba(128,128,128,.20);
+                  border-top: 4px solid var(--accent); }
+    .macro-card .value { font-size: 1.7rem; font-weight: 750; }
+    .macro-card .label { font-size: .8rem; opacity: .7; margin-top: .15rem; }
+
+    .split-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; margin: .6rem 0 .3rem;
+                 background: rgba(128,128,128,.18); }
+    .split-legend { display: flex; justify-content: space-between; font-size: .8rem; opacity: .8; flex-wrap: wrap; gap: .4rem; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: .3rem; }
+
+    .ingredient { display: flex; align-items: center; gap: .7rem; padding: .45rem .8rem; margin: .3rem 0;
+                  border-radius: 12px; background: rgba(128,128,128,.08); border: 1px solid rgba(128,128,128,.18); }
+    .ingredient .name { flex: 0 0 38%; font-weight: 600; text-transform: capitalize; }
+    .ingredient .bar { flex: 1; height: 8px; border-radius: 999px; background: rgba(128,128,128,.2); overflow: hidden; }
+    .ingredient .bar > span { display: block; height: 100%; border-radius: 999px;
+                              background: linear-gradient(90deg,#10b981,#3b82f6); }
+    .ingredient .pct { flex: 0 0 3.2rem; text-align: right; font-size: .85rem; opacity: .8; }
+    .ingredient.dim { opacity: .55; }
+
+    .note { padding: .8rem 1rem; border-radius: 14px; font-size: .88rem; margin: 1rem 0;
+            background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.4); }
+    .footer { text-align: center; opacity: .6; font-size: .82rem; margin-top: 2.5rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,146 +138,138 @@ def predict_nutrition(image_file):
     except Exception as e:
         return None, f"❌ Error: {str(e)}"
 
-def create_nutrition_charts(data):
-    """Create beautiful nutrition visualization charts"""
-    # This function is no longer used but kept for compatibility
-    pass
-
 def display_metrics(data):
-    """Display key metrics in a visually appealing way"""
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{data['total_calories']:.0f}</div>
-            <div class="metric-label">Calories</div>
+    """Calories hero card, macro cards and a calorie-split bar"""
+    st.markdown(f"""
+    <div class="kcal-card">
+        <div class="value">{data['total_calories']:.0f}</div>
+        <div class="label">kcal · estimated total</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<div style='height:.8rem'></div>", unsafe_allow_html=True)
+
+    cards = [
+        ("Protein", f"{data['total_protein']:.1f} g", "#3b82f6"),
+        ("Fat", f"{data['total_fat']:.1f} g", "#f59e0b"),
+        ("Carbs", f"{data['total_carbs']:.1f} g", "#10b981"),
+        ("Mass", f"{data['total_mass']:.0f} g", "#a855f7"),
+    ]
+    for col, (label, value, color) in zip(st.columns(4), cards):
+        col.markdown(f"""
+        <div class="macro-card" style="--accent:{color}">
+            <div class="value">{value}</div>
+            <div class="label">{label}</div>
         </div>
         """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{data['total_protein']:.1f}g</div>
-            <div class="metric-label">Protein</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{data['total_fat']:.1f}g</div>
-            <div class="metric-label">Fat</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{data['total_carbs']:.1f}g</div>
-            <div class="metric-label">Carbs</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col5:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{data['total_mass']:.1f}g</div>
-            <div class="metric-label">Total Mass</div>
-        </div>
-        """, unsafe_allow_html=True)
+
+    # Calories by macro (4/9/4 kcal per gram)
+    kc = {"Protein": 4 * data["total_protein"], "Fat": 9 * data["total_fat"], "Carbs": 4 * data["total_carbs"]}
+    total = sum(kc.values()) or 1.0
+    colors = {"Protein": "#3b82f6", "Fat": "#f59e0b", "Carbs": "#10b981"}
+    bar = "".join(f'<div style="width:{v / total * 100:.1f}%;background:{colors[k]}"></div>' for k, v in kc.items())
+    legend = "".join(
+        f'<span><span class="dot" style="background:{colors[k]}"></span>{k} {v / total:.0%}</span>' for k, v in kc.items()
+    )
+    st.markdown(f'<div class="split-bar">{bar}</div><div class="split-legend">{legend}</div>', unsafe_allow_html=True)
+
 
 def display_detected_foods(data):
-    """Display detected foods with mean confidence"""
-    st.markdown("### 🍽️ Detected Foods")
-    
-    # Mean confidence
-    st.markdown(f"**Mean Confidence: {data['mean_conf']:.1%}**")
-    
-    # Food tags
-    foods_html = ""
-    for food in data['labels_txt']:
-        foods_html += f'<span class="food-tag">{food}</span>'
-    
-    st.markdown(foods_html, unsafe_allow_html=True)
+    """Detected ingredients with confidence bars, plus the model's other top guesses"""
+    st.markdown('<div class="section-title">🥗 Detected ingredients</div>', unsafe_allow_html=True)
+
+    if not data["labels_txt"]:
+        st.warning("No ingredient reached the confidence threshold, so the nutrition numbers are not meaningful. "
+                   "Try a clearer, top-down photo of a single plate.")
+    rows = ""
+    for name, conf in zip(data["labels_txt"], data["labels_conf"]):
+        rows += (f'<div class="ingredient"><span class="name">{name}</span>'
+                 f'<span class="bar"><span style="width:{conf * 100:.0f}%"></span></span>'
+                 f'<span class="pct">{conf:.0%}</span></div>')
+    st.markdown(rows, unsafe_allow_html=True)
+
+    others = [(n, p) for n, p in data.get("top_candidates", []) if n not in data["labels_txt"]]
+    if others:
+        with st.expander("Other candidates the model considered"):
+            rows = "".join(
+                f'<div class="ingredient dim"><span class="name">{n}</span>'
+                f'<span class="bar"><span style="width:{p * 100:.0f}%"></span></span>'
+                f'<span class="pct">{p:.0%}</span></div>' for n, p in others
+            )
+            st.markdown(rows, unsafe_allow_html=True)
+
 
 def main():
     # Header
-    st.markdown('<h1 class="main-header">🍎 CalorieNet</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">AI-Powered Food Nutrition Analyzer</p>', unsafe_allow_html=True)
-    
-    # Check API status
+    st.markdown("""
+    <div class="hero">
+        <h1>🍽️ dish2calories</h1>
+        <p>Snap a plate. Get calories, macros and ingredients in seconds.</p>
+        <div class="pills">
+            <span class="pill">EfficientNet-B0</span><span class="pill">Nutrition5k</span>
+            <span class="pill">75 ingredients</span><span class="pill">ONNX Runtime</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Check backend status
     if not check_api_health():
         if USE_API:
-            st.error("🚨 **CalorieNet API is not running!**")
+            st.error("🚨 **The API is not running!**")
             st.info("Please start the API server first:")
             st.code("python inference.py", language="bash")
         else:
             st.error("🚨 **Could not load the model.** Check that `weights/` and `configs/` exist.")
         st.stop()
-    
-    # File uploader
-    st.markdown("### 📸 Upload Food Image")
-    uploaded_file = st.file_uploader(
-        "Choose a food image...",
-        type=['jpg', 'jpeg', 'png', 'bmp', 'webp'],
-        help="Upload a clear image of food for nutrition analysis"
-    )
-    
-    if uploaded_file is not None:
-        # Display uploaded image centered
-        st.markdown("#### 📸 Your Image")
-        image = Image.open(uploaded_file)
-        
-        # Center the image
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image(image, caption="Uploaded Image", use_container_width=True)
-        
-        # Center the analyze button
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            analyze_clicked = st.button("🔍 Analyze Nutrition", type="primary", use_container_width=True)
-        
-        if analyze_clicked:
-            with st.spinner("🧠 AI is analyzing your food..."):
-                # Reset file pointer
-                uploaded_file.seek(0)
-                
-                # Get prediction
-                result, error = predict_nutrition(uploaded_file)
-                
-                if error:
-                    st.error(error)
-                else:
-                    st.success("✅ Analysis Complete!")
-                    
-                    # Store result in session state for persistent display
-                    st.session_state['analysis_result'] = result
-        
-        # Display results if available
-        if 'analysis_result' in st.session_state:
-            result = st.session_state['analysis_result']
-            
-            st.markdown("---")
-            
-            # Key metrics
-            st.markdown("### 📊 Nutrition Summary")
-            display_metrics(result)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Detected foods
-            display_detected_foods(result)
-    
-    # Footer
-    st.markdown("---")
+
     st.markdown(
-        "<p style='text-align: center; color: #666; font-size: 0.9rem;'>"
-        "Made with ❤️ using CalorieNet AI | Upload food images for instant nutrition analysis"
-        "</p>", 
-        unsafe_allow_html=True
+        '<div class="note">💡 <b>Works best on:</b> a single plate photographed from above, in good light, '
+        'with everyday cafeteria-style foods. The model only knows 75 ingredients '
+        '(no pasta, bread, noodles, soups or desserts), so unfamiliar dishes get matched to the closest known ingredient '
+        'and the numbers can be far off.</div>',
+        unsafe_allow_html=True,
     )
+
+    uploaded_file = st.file_uploader(
+        "Upload a photo of your dish",
+        type=['jpg', 'jpeg', 'png', 'bmp', 'webp'],
+        help="JPG, PNG, BMP or WEBP, up to 10 MB",
+    )
+
+    if uploaded_file is None:
+        st.session_state.pop("analysis", None)
+        st.markdown('<div class="footer">Estimates only, not medical or dietary advice.</div>', unsafe_allow_html=True)
+        return
+
+    file_key = (uploaded_file.name, uploaded_file.size)
+    # Drop results that belong to a previously uploaded image
+    if st.session_state.get("analysis", {}).get("key") != file_key:
+        st.session_state.pop("analysis", None)
+
+    image = Image.open(uploaded_file)
+    st.image(image, use_container_width=True)
+
+    if st.button("🔍 Analyze nutrition", type="primary", use_container_width=True):
+        with st.spinner("Analyzing your dish..."):
+            uploaded_file.seek(0)
+            result, error = predict_nutrition(uploaded_file)
+        if error:
+            st.error(error)
+        else:
+            st.session_state["analysis"] = {"key": file_key, "result": result}
+
+    analysis = st.session_state.get("analysis")
+    if analysis:
+        result = analysis["result"]
+        st.markdown('<div class="section-title">📊 Nutrition summary</div>', unsafe_allow_html=True)
+        display_metrics(result)
+        display_detected_foods(result)
+        if result["mean_conf"] < 0.6 and result["labels_txt"]:
+            st.markdown('<div class="note">⚠️ Low confidence. This dish may be outside what the model was trained on.</div>',
+                        unsafe_allow_html=True)
+
+    st.markdown('<div class="footer">Estimates only, not medical or dietary advice. '
+                'Built with PyTorch → ONNX · Streamlit</div>', unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()

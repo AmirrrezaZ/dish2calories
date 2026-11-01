@@ -40,4 +40,5 @@ def format_results(results: Dict) -> Dict:
         "labels_conf": [float(c) for c in results["labels_conf"]],
         "mean_conf": float(results["mean_conf"]),
         "labels_txt": results["labels_txt"],
+        "top_candidates": [[n, float(p)] for n, p in results.get("top_candidates", [])],
     }

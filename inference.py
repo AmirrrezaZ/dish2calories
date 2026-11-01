@@ -34,6 +34,7 @@ class NutritionResponse(BaseModel):
     labels_conf: List[float] = Field(..., description="Confidence scores")
     mean_conf: float = Field(..., description="Mean confidence")
     labels_txt: List[str] = Field(..., description="Detected foods")
+    top_candidates: List[List] = Field(default_factory=list, description="Top-5 [ingredient, probability] pairs, even below the threshold")
 
 class ErrorResponse(BaseModel):
     error: str
