@@ -1,0 +1,19 @@
+# CPU-only image: small, no NVIDIA toolkit needed. EfficientNet-B0 runs fine on CPU.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000 8501
+ENV STREAMLIT_SERVER_HEADLESS=true \
+    PYTHONUNBUFFERED=1 \
+    DEVICE=cpu
+
+# Default: API + UI in one container (see start.sh).
+CMD ["bash", "start.sh"]

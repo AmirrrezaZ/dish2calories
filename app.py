@@ -1,6 +1,8 @@
 """
 CalorieNet Streamlit UI
 """
+import os
+
 import streamlit as st
 import requests
 from PIL import Image
@@ -65,7 +67,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Configuration
-API_URL = "http://localhost:8000"
+API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 UPLOAD_ENDPOINT = f"{API_URL}/predict"
 HEALTH_ENDPOINT = f"{API_URL}/health"
 
@@ -168,7 +170,7 @@ def main():
     if not check_api_health():
         st.error("🚨 **CalorieNet API is not running!**")
         st.info("Please start the API server first:")
-        st.code("python infrence.py", language="bash")
+        st.code("python inference.py", language="bash")
         st.stop()
     
     # File uploader

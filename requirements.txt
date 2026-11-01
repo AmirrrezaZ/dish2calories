@@ -11,3 +11,5 @@ torchmetrics>=1.4.0
 tqdm==4.66.2
 uvicorn==0.37.0
 
+torch>=2.3
+torchvision>=0.18
