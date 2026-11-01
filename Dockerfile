@@ -1,24 +1,17 @@
-# PyTorch base image with CUDA 11.8 + cuDNN 8
-FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-devel
+# GPU image (CUDA runtime, much smaller than the -devel variant).
+# For CPU-only hosts use Dockerfile.cpu instead.
+FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
 
-# Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY ./ /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        libpng-dev \
-        libjpeg-dev \
-        zlib1g-dev \
-    && pip install --no-cache-dir -r requirements.txt \
-    && rm -rf /var/lib/apt/lists/*
+COPY . .
 
-# (Optional) show these ports in docker ps; compose still maps them
-EXPOSE 8000
-EXPOSE 8501
+EXPOSE 8000 8501
+ENV STREAMLIT_SERVER_HEADLESS=true \
+    PYTHONUNBUFFERED=1
 
-# (Optional) avoid Streamlit asking for a browser
-ENV STREAMLIT_SERVER_HEADLESS=true
+# Default: API + UI in one container (see start.sh). Compose overrides this.
+CMD ["bash", "start.sh"]

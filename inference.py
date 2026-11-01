@@ -2,6 +2,7 @@
 CalorieNet FastAPI Server - Simple, Standard, Advanced
 """
 import logging
+import os
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Dict, List
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import torch
 import uvicorn
 
 from dataset_loaders import DatasetInfo
@@ -23,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 class Config:
     MODEL_TYPE = "efficientnet_b0"
-    DEVICE = "cuda"
+    DEVICE = os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
     DATASET_CONFIG = "configs/dataset_info.json"
     WEIGHTS_DIR = "weights"
     CLS_THRESHOLD = 0.5
@@ -215,8 +217,8 @@ async def predict(file: UploadFile = File(...)):
 if __name__ == "__main__":
     uvicorn.run(
         "inference:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
+        host=os.getenv("API_HOST", "0.0.0.0"),
+        port=int(os.getenv("API_PORT", "8000")),
+        reload=os.getenv("API_RELOAD", "0") == "1",
         log_level="info"
     )
