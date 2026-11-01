@@ -11,11 +11,9 @@ from typing import Dict, List
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import torch
 import uvicorn
 
-from dataset_loaders import DatasetInfo
-from models import CalorieNet
+import service
 from predict import CalorieNetPredictor
 
 # Configure logging
@@ -24,12 +22,6 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 class Config:
-    MODEL_TYPE = "efficientnet_b0"
-    DEVICE = os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
-    DATASET_CONFIG = "configs/dataset_info.json"
-    WEIGHTS_DIR = "weights"
-    CLS_THRESHOLD = 0.5
-    TEMPERATURE = 0.5
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -67,16 +59,7 @@ def validate_file(file: UploadFile) -> None:
 def format_results(results: Dict) -> Dict:
     """Format prediction results for JSON response"""
     try:
-        return {
-            "total_protein": float(results["total_protein"][0]),
-            "total_fat": float(results["total_fat"][0]),
-            "total_carbs": float(results["total_carbs"][0]),
-            "total_calories": float(results["total_calories"][0]),
-            "total_mass": float(results["total_mass"][0]),
-            "labels_conf": [float(c) for c in results["labels_conf"]],
-            "mean_conf": float(results["mean_conf"]),
-            "labels_txt": results["labels_txt"],
-        }
+        return service.format_results(results)
     except (KeyError, IndexError, TypeError) as e:
         logger.error(f"Error formatting results: {e}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Error processing results")
@@ -89,31 +72,7 @@ async def startup():
     try:
         logger.info("Loading CalorieNet model...")
         
-        # Validate paths
-        config_path = Path(Config.DATASET_CONFIG)
-        weights_path = Path(Config.WEIGHTS_DIR) / f"{Config.MODEL_TYPE}.pth"
-        
-        if not config_path.exists():
-            raise FileNotFoundError(f"Config not found: {config_path}")
-        if not weights_path.exists():
-            raise FileNotFoundError(f"Weights not found: {weights_path}")
-        
-        # Load components
-        info = DatasetInfo.from_json(str(config_path))
-        model, _ = CalorieNet.from_checkpoint(str(weights_path))
-        
-        # Initialize predictor
-        predictor = CalorieNetPredictor(
-            model=model,
-            norm_ingr=info.norm_ingr,
-            scaler=info.scalers["total_mass"],
-            idx2cls=info.idx2cls,
-            img_size=info.img_size,
-            cls_threshold=Config.CLS_THRESHOLD,
-            temperature=Config.TEMPERATURE,
-            mode="probs",
-            device=Config.DEVICE,
-        )
+        predictor = service.load_predictor()
         
         logger.info("Model loaded successfully!")
         

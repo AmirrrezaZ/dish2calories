@@ -67,20 +67,52 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Configuration
-API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+# If API_URL is set, the UI talks to a separate FastAPI server (Docker / compose).
+# Otherwise the model runs inside this process (Streamlit Community Cloud, local `streamlit run app.py`).
+API_URL = os.getenv("API_URL", "").rstrip("/")
+USE_API = bool(API_URL)
 UPLOAD_ENDPOINT = f"{API_URL}/predict"
 HEALTH_ENDPOINT = f"{API_URL}/health"
 
+
+@st.cache_resource(show_spinner="Loading model (first run only)...")
+def get_local_predictor():
+    """Load the model once per server process (imports torch lazily so the page renders fast)."""
+    import service
+    return service.load_predictor()
+
+
 def check_api_health():
-    """Check if API is running"""
+    """Check that the backend (remote API or local model) is ready"""
+    if not USE_API:
+        try:
+            get_local_predictor()
+            return True
+        except Exception:
+            return False
     try:
         response = requests.get(HEALTH_ENDPOINT, timeout=5)
         return response.status_code == 200 and response.json().get("model_loaded", False)
-    except:
+    except Exception:
         return False
 
+
+def predict_local(image_file):
+    """Run the model in-process"""
+    try:
+        import numpy as np
+        import service
+        img = np.array(Image.open(image_file).convert("RGB"))
+        results = get_local_predictor().predict_img(img)
+        return service.format_results(results), None
+    except Exception as e:
+        return None, f"❌ Error: {str(e)}"
+
+
 def predict_nutrition(image_file):
-    """Send image to API and get nutrition predictions"""
+    """Get nutrition predictions (remote API or local model)"""
+    if not USE_API:
+        return predict_local(image_file)
     try:
         files = {"file": image_file}
         response = requests.post(UPLOAD_ENDPOINT, files=files, timeout=30)
@@ -92,7 +124,7 @@ def predict_nutrition(image_file):
             return None, f"API Error: {error_detail}"
             
     except requests.exceptions.ConnectionError:
-        return None, "❌ Cannot connect to API. Make sure the CalorieNet API is running on localhost:8000"
+        return None, f"❌ Cannot connect to API at {API_URL}"
     except requests.exceptions.Timeout:
         return None, "⏱️ Request timed out. Please try again."
     except Exception as e:
@@ -168,9 +200,12 @@ def main():
     
     # Check API status
     if not check_api_health():
-        st.error("🚨 **CalorieNet API is not running!**")
-        st.info("Please start the API server first:")
-        st.code("python inference.py", language="bash")
+        if USE_API:
+            st.error("🚨 **CalorieNet API is not running!**")
+            st.info("Please start the API server first:")
+            st.code("python inference.py", language="bash")
+        else:
+            st.error("🚨 **Could not load the model.** Check that `weights/` and `configs/` exist.")
         st.stop()
     
     # File uploader

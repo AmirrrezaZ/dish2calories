@@ -184,7 +184,9 @@ curl -F "file=@dataset/test.jpg" http://localhost:8000/predict
 | `weights/` | Trained checkpoint (`efficientnet_b0.pth`, included in the repo) |
 | `configs/dataset_info.json` | Class index and per-gram ingredient nutrition table |
 | `dataset/` | Metadata CSVs (images are **not** included – download them, see Dataset) |
-| `Dockerfile`, `Dockerfile.cpu`, `docker-compose*.yml`, `start.sh` | Container and deployment setup |
+| `service.py` | Model loading + result formatting shared by the UI and the API |
+| `requirements*.txt` | `requirements.txt` (app), `-api` (FastAPI), `-train` (training) |
+| `Dockerfile`, `Dockerfile.cpu`, `docker-compose*.yml`, `start.sh` | Container setup |
 
 ---
 
@@ -213,14 +215,17 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-# Install PyTorch first (pick your CUDA/CPU build): https://pytorch.org/get-started/locally/
-pip install -r requirements.txt
-
-python inference.py        # terminal 1: FastAPI on :8000
-streamlit run app.py       # terminal 2: Streamlit on :8501
+pip install -r requirements.txt     # CPU PyTorch + Streamlit
+streamlit run app.py                # runs the model in-process, no API needed
 ```
 
-The device is auto-detected (CUDA if available, else CPU). Configuration is via environment variables – see [`.env.example`](.env.example): `API_HOST`, `API_PORT`, `API_URL` (used by the UI), `DEVICE`, `API_RELOAD`.
+To also run the REST API: `pip install -r requirements-api.txt && python inference.py`. To train: `pip install -r requirements-train.txt`.
+
+The UI has two modes: if the `API_URL` environment variable is set it calls that FastAPI server (this is what Docker Compose does); otherwise it loads the model directly. The device is auto-detected (CUDA if available, else CPU). Configuration is via environment variables – see [`.env.example`](.env.example): `API_HOST`, `API_PORT`, `API_URL`, `DEVICE`, `API_RELOAD`.
+
+### 🔹 Live Demo
+
+Hosted on Streamlit Community Cloud: <https://dish2calories.streamlit.app/>. It uses `app.py` with the lean `requirements.txt` (CPU-only PyTorch) so the deploy stays fast.
 
 ### 🔹 Training & Evaluation
 
@@ -236,26 +241,6 @@ The device is auto-detected (CUDA if available, else CPU). Configuration is via 
 4. Evaluate with `evaluate.py` (`NutritionEvaluator`) and plot curves with `logs_visualizer.py`.
 
 The repo already ships a trained `weights/efficientnet_b0.pth`, so you do **not** need to train to run the app.
-
----
-
-## ☁️ Deployment
-
-The app is two processes: a FastAPI backend (PyTorch model) and a Streamlit UI. `start.sh` runs both in one container, so any host that runs a single Docker container works. EfficientNet-B0 is fast enough on CPU, so a GPU is not required.
-
-| Option | Cost | Best for | How |
-|--------|------|----------|-----|
-| **Streamlit Community Cloud** | Free | Quick public demo | Point it at this repo and `app.py`. It can't run the separate API, so set `API_URL` to an API hosted elsewhere. |
-| **Hugging Face Spaces (Docker)** | Free CPU tier | ML demos | Create a *Docker* Space, copy this repo in, rename `Dockerfile.cpu` to `Dockerfile`, and add `app_port: 8501` to the Space README metadata. |
-| **Render / Railway / Fly.io** | Free–low | Simple Docker deploys | New Web Service from the repo with Dockerfile path `Dockerfile.cpu`. The platform sets `PORT`, which `start.sh` honors. |
-| **Google Cloud Run / AWS App Runner / Azure Container Apps** | Pay per use | Production, scales to zero | Build `Dockerfile.cpu`, push to a registry, deploy with port 8501 (Cloud Run: `gcloud run deploy --source . ` with `--memory 2Gi`). |
-| **VPS (Hetzner, DigitalOcean, …)** | Low, always on | Full control | `docker compose up -d --build`, then put Caddy or nginx in front for HTTPS. |
-| **GPU hosts (Modal, RunPod, ECS/GKE GPU)** | Higher | High throughput | Use `Dockerfile` + `docker-compose.gpu.yml`. |
-
-Notes:
-- Give the container at least 2 GB RAM (PyTorch + the model).
-- Add authentication or rate limiting before exposing `/predict` publicly – it accepts uploads up to 10 MB.
-- Free tiers sleep when idle, so the first request can be slow.
 
 ---
 
