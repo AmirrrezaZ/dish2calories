@@ -4,8 +4,10 @@ FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The base image already ships CUDA PyTorch, so skip the torch lines of requirements.txt.
+COPY requirements.txt requirements-api.txt ./
+RUN grep -vE '^(torch|torchvision|--extra-index-url)' requirements.txt > /tmp/req.txt \
+    && pip install --no-cache-dir -r /tmp/req.txt -r requirements-api.txt
 
 COPY . .
 
