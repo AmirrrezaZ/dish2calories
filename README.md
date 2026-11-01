@@ -176,17 +176,19 @@ curl -F "file=@dataset/test.jpg" http://localhost:8000/predict
 |------|---------|
 | `app.py` | Streamlit UI |
 | `inference.py` | FastAPI server (`/`, `/health`, `/predict`) |
-| `predict.py` | `CalorieNetPredictor` – inference and nutrition calculation |
+| `onnx_predictor.py` | Lightweight ONNX Runtime inference + nutrition calculation (used by the app and API) |
+| `predict.py` | PyTorch `CalorieNetPredictor` (used for evaluation) |
+| `export_onnx.py` | Converts the `.pth` checkpoint to `.onnx` |
 | `models.py`, `loss.py` | CalorieNet model and multi-task loss |
 | `dataset_loaders.py` | Nutrition5k data loading and splits |
 | `main.py`, `train.py` | Training entry point and loop |
 | `evaluate.py`, `logs_visualizer.py` | Metrics and training-curve plots |
-| `weights/` | Trained checkpoint (`efficientnet_b0.pth`, included in the repo) |
+| `weights/` | Trained checkpoint (`efficientnet_b0.pth`) and exported `efficientnet_b0.onnx` |
 | `configs/dataset_info.json` | Class index and per-gram ingredient nutrition table |
 | `dataset/` | Metadata CSVs (images are **not** included – download them, see Dataset) |
 | `service.py` | Model loading + result formatting shared by the UI and the API |
-| `requirements*.txt` | `requirements.txt` (app), `-api` (FastAPI), `-train` (training) |
-| `Dockerfile`, `Dockerfile.cpu`, `docker-compose*.yml`, `start.sh` | Container setup |
+| `requirements*.txt` | `requirements.txt` (app), `-api` (FastAPI), `-train` (PyTorch, training/export) |
+| `Dockerfile`, `docker-compose.yml`, `start.sh` | Container setup |
 
 ---
 
@@ -195,11 +197,7 @@ curl -F "file=@dataset/test.jpg" http://localhost:8000/predict
 ### 🔹 Docker Compose
 
 ```bash
-# CPU (default)
 docker compose up --build
-
-# NVIDIA GPU (requires the NVIDIA Container Toolkit)
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 
 * FastAPI: [http://localhost:8000](http://localhost:8000)
@@ -209,38 +207,47 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 
 * Run in background: `docker compose up --build -d`
 * Stop & clean up: `docker compose down`
-* Single container with both API and UI: `docker build -f Dockerfile.cpu -t dish2calories . && docker run -p 8501:8501 dish2calories`
+* Single container with both API and UI: `docker build -t dish2calories . && docker run -p 8501:8501 dish2calories`
+
+Inference runs on **ONNX Runtime (CPU)**, so no GPU, CUDA or PyTorch is needed in the image.
 
 ### 🔹 Running Locally (Without Docker)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt     # CPU PyTorch + Streamlit
+pip install -r requirements.txt     # Streamlit + ONNX Runtime (small, no PyTorch)
 streamlit run app.py                # runs the model in-process, no API needed
 ```
 
-To also run the REST API: `pip install -r requirements-api.txt && python inference.py`. To train: `pip install -r requirements-train.txt`.
+To also run the REST API: `pip install -r requirements-api.txt && python inference.py`.
 
-The UI has two modes: if the `API_URL` environment variable is set it calls that FastAPI server (this is what Docker Compose does); otherwise it loads the model directly. The device is auto-detected (CUDA if available, else CPU). Configuration is via environment variables – see [`.env.example`](.env.example): `API_HOST`, `API_PORT`, `API_URL`, `DEVICE`, `API_RELOAD`.
+The UI has two modes: if the `API_URL` environment variable is set it calls that FastAPI server (this is what Docker Compose does); otherwise it loads the ONNX model directly. Configuration is via environment variables – see [`.env.example`](.env.example): `API_HOST`, `API_PORT`, `API_URL`, `API_RELOAD`.
 
 ### 🔹 Live Demo
 
-Hosted on Streamlit Community Cloud: <https://dish2calories.streamlit.app/>. It uses `app.py` with the lean `requirements.txt` (CPU-only PyTorch) so the deploy stays fast.
+Hosted on Streamlit Community Cloud: <https://dish2calories.streamlit.app/>. It runs `app.py` with the small `requirements.txt` (no PyTorch, unpinned versions) so installs are fast on any Python version.
 
 ### 🔹 Training & Evaluation
 
 1. Download the Nutrition5k side-angle images and place them under `dataset/` next to the metadata CSVs (see [Dataset](#-dataset)).
 2. Adjust hyper-parameters in the `config` dict at the top of `main.py` (image size, batch size, epochs, learning rate, `num_workers`, …).
-3. Train:
+3. Install training dependencies and train:
 
    ```bash
+   pip install -r requirements-train.txt   # PyTorch (CPU build; use pytorch.org for CUDA), torchmetrics, ...
    python main.py
    ```
 
    Checkpoints go to `weights/`, logs and loss curves to `logs/`, and class info to `configs/dataset_info.json`.
-4. Evaluate with `evaluate.py` (`NutritionEvaluator`) and plot curves with `logs_visualizer.py`.
+4. Export the trained checkpoint for the app (`weights/efficientnet_b0.onnx`):
 
-The repo already ships a trained `weights/efficientnet_b0.pth`, so you do **not** need to train to run the app.
+   ```bash
+   python export_onnx.py
+   ```
+
+5. Evaluate with `evaluate.py` (`NutritionEvaluator`) and plot curves with `logs_visualizer.py`.
+
+The repo already ships trained weights (`.pth` for training/evaluation and `.onnx` for the app), so you do **not** need to train to run the app. Re-run `export_onnx.py` after retraining.
 
 ---
 

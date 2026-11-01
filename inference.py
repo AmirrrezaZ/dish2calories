@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 import service
-from predict import CalorieNetPredictor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -41,7 +40,7 @@ class ErrorResponse(BaseModel):
     detail: str = None
 
 # Global predictor
-predictor: CalorieNetPredictor = None
+predictor = None
 
 # Utility functions
 def validate_file(file: UploadFile) -> None:
